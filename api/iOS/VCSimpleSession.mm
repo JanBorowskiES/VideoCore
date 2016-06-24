@@ -36,7 +36,7 @@
 #ifdef __APPLE__
 #   include <videocore/mixers/Apple/AudioMixer.h>
 #   include <videocore/transforms/Apple/MP4Multiplexer.h>
-#   include <videocore/transforms/Apple/H264Encode.h>
+#   include <videocore/transforms/Apple/H264EncodeApple.h>
 #   include <videocore/sources/Apple/PixelBufferSource.h>
 #   ifdef TARGET_OS_IPHONE
 #       include <videocore/sources/iOS/CameraSource.h>
@@ -699,6 +699,11 @@ namespace videocore { namespace simpleApi {
         m_videoMixer->setSourceFilter(m_cameraSource, dynamic_cast<videocore::IVideoFilter*>(m_videoMixer->filterFactory().filter(convertString))); // default is com.videocore.filters.bgra
 }
 
+- (void) pushBuffer: (CVPixelBufferRef) buffer
+{
+    m_cameraSource->bufferCaptured(buffer);
+}
+
 // -----------------------------------------------------------------------------
 //  Private Methods
 // -----------------------------------------------------------------------------
@@ -742,7 +747,7 @@ namespace videocore { namespace simpleApi {
 
         m_pbOutput = std::make_shared<videocore::simpleApi::PixelBufferOutput>([=](const void* const data, size_t size){
             CVPixelBufferRef ref = (CVPixelBufferRef)data;
-            [preview drawFrame:ref];
+            // [preview drawFrame:ref];
             if(self.rtmpSessionState == VCSessionStateNone) {
                 self.rtmpSessionState = VCSessionStatePreviewStarted;
             }
@@ -771,7 +776,8 @@ namespace videocore { namespace simpleApi {
                                                                                 );
 
 
-        std::dynamic_pointer_cast<videocore::iOS::CameraSource>(m_cameraSource)->setupCamera(self.fps,(self.cameraState == VCCameraStateFront),self.useInterfaceOrientation,nil,^{
+        // std::dynamic_pointer_cast<videocore::iOS::CameraSource>(m_cameraSource)->setupCamera(self.fps,(self.cameraState == VCCameraStateFront),self.useInterfaceOrientation,nil,^{
+        ^{
             m_cameraSource->setContinuousAutofocus(true);
             m_cameraSource->setContinuousExposure(true);
 
@@ -788,7 +794,7 @@ namespace videocore { namespace simpleApi {
             if ([_delegate respondsToSelector:@selector(didAddCameraSource:)]) {
                 [_delegate didAddCameraSource:self];
             }
-        });
+        }();
     }
     {
         // Add mic source
@@ -814,7 +820,7 @@ namespace videocore { namespace simpleApi {
         m_aacEncoder = std::make_shared<videocore::iOS::AACEncode>(self.audioSampleRate, self.audioChannelCount, 96000);
         if(SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"8.0")) {
             // If >= iOS 8.0 use the VideoToolbox encoder that does not write to disk.
-            m_h264Encoder = std::make_shared<videocore::Apple::H264Encode>(self.videoSize.width,
+            m_h264Encoder = std::make_shared<videocore::Apple::H264EncodeApple>(self.videoSize.width,
                                                                            self.videoSize.height,
                                                                            self.fps,
                                                                            self.bitrate,
